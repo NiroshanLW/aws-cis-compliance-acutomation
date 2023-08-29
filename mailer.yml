@@ -1,0 +1,5 @@
+queue_url: https://sqs.ap-southeast-1.amazonaws.com/630XXXXX434/XXX-cloud-c-test-sqs
+role: arn:aws:iam::630XXXXXXX34:role/XXXXXXX-custodian-auto-tagger
+from_address: AWS_Master@XXXXX.com
+region: ap-southeast-1
+

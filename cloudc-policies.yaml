@@ -1,0 +1,870 @@
+
+# Command to run policies:
+# c7n-mailer --config mailer.yml --update-lambda && custodian run --log-group=/cloud-custodian/630308457434/ap-southeast-1 -c cloudc-policies.yaml -s out/ --metrics aws://?namespace=aws_cis_violations
+
+#The policy is validated automatically when you run it, but you can also validate it separately:
+#custodian validate custodian.yml
+
+#You can also check which resources are identified by the policy, without running any actions on the resources:
+#custodian run --dryrun -s . custodian.yml
+
+policies:
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS IAM.1 IAM policies should not allow full "*" administrative privileges 
+
+  - name: CIS_IAM_1_DeleteIamPolicyWithFulAdminAccess
+    resource: aws.iam-policy
+    description: |
+      This policy automatically detect and delete IAM polices attahced 
+      with full administrative privillages.
+    filters:
+      - type: has-allow-all
+    mode:
+      schedule: "rate(24 hours)"
+      type: periodic
+      role: arn:aws:iam::6303XXXXXXX434:role/XX-custodian-auto-tagger
+    actions:
+      - delete
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS IAM.1 IAM policies should not allow full "*" administrative privileges
+        action_desc: This policy automatically detect and delete IAM polices attahced with full administrative privillages. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXXXX7434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS IAM.1 IAM policies should not allow full "*" administrative privileges
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXX7434/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.4.0
+#CIS S3.1 S3 Block Public Access setting should be enabled
+
+  - name: CIS_S3_1_BlockS3PublicAccess
+    resource: s3
+    description: |
+      This policy is triggered when a new S3 bucket is created and 
+      it automatically block the public access.
+    mode:
+      type: cloudtrail
+      events:
+        - CreateBucket
+      role: arn:aws:iam::63XXXXX57434:role/XXXXX-custodian-auto-tagger
+      timeout: 200
+    actions:
+      - type: set-public-block
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS S3.1 S3 Block Public Access setting should be enabled
+        action_desc: This policy is triggered when a new S3 bucket is created and it automatically block the public access. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXXX34/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS S3.1 S3 Block Public Access setting should be enabled
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXX7434/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.4.0
+#CIS S3.4 S3 buckets should have server-side encryption enabled
+#CIS S3.5 S3 buckets should require requests to use Secure Socket Layer
+#CIS S3.8 S3 Block Public Access setting should be enabled at the bucket-level
+
+  - name: CIS_S3_4_5_8_EnableS3EncrypVersioningLifeCycle
+    resource: s3
+    description: |
+      This policy is triggered when a new S3 bucket is created and 
+      it automatically enable encryption, versioning and life cycling.
+    mode:
+      type: cloudtrail
+      events:
+        - CreateBucket
+      role: arn:aws:iam::63XXXXXXXX434:role/XXXXXX-custodian-auto-tagger
+      timeout: 200
+    actions:
+      - type: set-public-block
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true        
+      - type: auto-tag-user
+        tag: CreatorName
+      - type: set-bucket-encryption
+      - type: toggle-versioning
+        enabled: true
+      - type: toggle-logging
+        target_bucket: "{account_id}-{region}-s3-logs"
+        target_prefix: "{source_bucket_name}/"
+      - type: configure-lifecycle
+        rules:
+        - ID: lifecycle_rule
+          Status: Enabled
+          Filter:
+              Prefix: /
+          Transitions:
+            - Days: 60
+              StorageClass: STANDARD_IA
+          NoncurrentVersionExpiration:
+              NoncurrentDays: 20
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS S3.4 S3 buckets should have server-side encryption enabled/CIS S3.5 S3 buckets should require requests to use Secure Socket Layer/CIS S3.8 S3 Block Public Access setting should be enabled at the bucket-level
+        action_desc: This policy is triggered when a new S3 bucket is created and it automatically enable encryption, versioning and life cycling.
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXXXXX34/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS S3.4 S3 buckets should have server-side encryption enabled/CIS S3.5 S3 buckets should require requests to use Secure Socket Layer/CIS S3.8 S3 Block Public Access setting should be enabled at the bucket-level.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXX434/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS IAM.8 Unused IAM user credentials should be removed
+
+  - name: CIS_IAM_8_DeleteUnusedIamUsers
+    resource: aws.iam-user
+    description: |
+      This policy will automatically detect unused IAM users and delete it.  
+    filters:
+      - or:
+        - and: 
+          - type: credential
+            key: password_enabled
+            value: true
+          - type: credential
+            key: password_last_used
+            value: 45
+            op: gt
+            value_type: age
+    mode:
+      schedule: "rate(7 days)"
+      type: periodic
+      role: arn:aws:iam::630XXXXXXX34:role/XXXXXXX-custodian-auto-tagger
+    actions:
+      - delete
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS IAM.8 Unused IAM user credentials should be removed.
+        action_desc: This policy will automatically detect unused IAM users and delete it. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXXXX434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS IAM.8 Unused IAM user credentials should be removed.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXXX34/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS IAM.3 IAM users' access keys should be rotated every 90 days or less.
+
+  - name: CIS_IAM_3_DeleteNotRotatedAccessKeys
+    resource: aws.iam-user
+    description: |
+      This policy will automatically detect and delete access kesy not rotated after 90 days.  
+    filters:
+      - and:
+        - type: credential
+          key: access_keys.active
+          value: true
+        - type: credential
+          key: access_keys.last_rotated
+          value: 90
+          op: gt
+          value_type: age
+    mode:
+      schedule: "rate(7 days)"
+      type: periodic
+      role: arn:aws:iam::630XXXXXXX434:role/XXXXXX-custodian-auto-tagger
+    actions:
+      - type: remove-keys
+        disable: true
+        age: 90
+      - type: remove-keys
+        age: 100
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS IAM.3 IAM users' access keys should be rotated every 90 days or less.
+        action_desc: This policy will automatically detect and delete access kesy not rotated after 90 days. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXX34/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS IAM.3 IAM users' access keys should be rotated every 90 days or less.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX434/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS IAM.11 Ensure IAM password policy requires at least one uppercase letter.
+#CIS IAM.12 Ensure IAM password policy requires at least one lowercase letter.
+#CIS IAM.13 Ensure IAM password policy requires at least one symbol.
+#CIS IAM.14 Ensure IAM password policy requires at least one number.
+#CIS IAM.15 Ensure IAM password policy requires minimum password length of 14 or greater.
+#CIS IAM.16 Ensure IAM password policy prevents password reuse.
+#CIS IAM.17 Ensure IAM password policy expires passwords within 90 days or less.
+
+  - name: CIS_IAM_11_12_13_14_15_16_17_SetAccountPasswordPolicy
+    resource: account
+    description: |
+      This policy will automaically set account password policy based on
+      cloud security best practices.
+    mode:
+      schedule: "rate(30 days)"
+      type: periodic
+      role: arn:aws:iam::63XXXXXXXX434:role/XXXXX-custodian-auto-tagger
+    actions:
+      - type: set-password-policy
+        policy:
+          MinimumPasswordLength: 20
+          PasswordReusePrevention: 24
+          RequireUppercaseCharacters: true
+          RequireLowercaseCharacters: true
+          RequireNumbers: true
+          RequireSymbols: true
+          MaxPasswordAge: 90
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS IAM.11-17 Ensure IAM password policy requires at least one uppercase letter/lowercase letter/sybol/number/minimum password length of 14 or greater/prevents password reuse/expires passwords within 90 days or less.
+        action_desc: This policy will automaically set account password policy based on cloud security best practices. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXX4/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS IAM.11-17 Ensure IAM password policy requires at least one uppercase letter/lowercase letter/sybol/number/minimum password length of 14 or greater/prevents password reuse/expires passwords within 90 days or less.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXX7434/XX-cloud-c-test-sqs
+          
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS IAM.4 IAM root user access key should not exist.
+
+  - name: CIS_IAM_4_NotifyRootIamAccessKeys
+    resource: aws.account
+    description: |
+        This policy will automaically detect and notify IAM root
+        access keys to relevant stakehlders to rectify.
+    mode:
+      schedule: "rate(1 day)"
+      type: periodic
+      role: arn:aws:iam::630XXXXXXXX34:role/XXXXX-custodian-auto-tagger
+    filters:
+      - or:
+        - type: iam-summary
+          key: AccountMFAEnabled
+          op: eq
+          value: false
+          value_type: swap
+        - type: iam-summary
+          key: AccountAccessKeysPresent
+          op: eq
+          value: true
+          value_type: swap    
+    actions:
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS IAM.4 IAM root user access key should not exist.
+        action_desc: This policy will automaically detect and notify IAM root access keys to relevant stakehlders to rectify. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXXXXXX434/XXX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS IAM.4 IAM root user access key should not exist.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXXXX34/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS IAM.9 Virtual MFA should be enabled for the root user.
+
+  - name: RootMustUseMfa
+    resource: aws.account
+    description: |
+      This policy automatically detect if MFA is not enabled for root, 
+      and notify it to relevant stakehlders to rectify. 
+    mode:
+      schedule: "rate(30 days)"
+      type: periodic
+      role: arn:aws:iam::630XXXXXXXX434:role/XXXXXXXX-custodian-auto-tagger
+    filters:
+      - or:
+        - type: iam-summary
+          key: AccountMFAEnabled
+          op: eq
+          value: false
+          value_type: swap
+        - type: has-virtual-mfa
+          value: false        
+    actions:
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS IAM.9 Virtual MFA should be enabled for the root user.
+        action_desc: This policy automatically detect if MFA is not enabled for root, and notify it to relevant stakehlders to rectify.  
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXX434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS IAM.9 Virtual MFA should be enabled for the root user.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXX434/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS EC2.13 Security groups should not allow ingress from 0.0.0.0/0 to port 22.
+
+  - name: CIS_EC2_13_RemoveSecGroupViolationsPort22
+    resource: security-group
+    description: |
+      This policy automatically detect any security group that allows 0.0.0.0/0 or ::/0 (IPv6) 
+      ingress on port 22. Notify it and remove instantly.
+    mode:
+      type: cloudtrail
+      role: arn:aws:iam::630XXXXXXX434:role/XXXXXXXX-custodian-auto-tagger
+      events:
+        - source: ec2.amazonaws.com
+          event: AuthorizeSecurityGroupIngress
+          ids: "requestParameters.groupId"
+        - source: ec2.amazonaws.com
+          event: RevokeSecurityGroupIngress
+          ids: "requestParameters.groupId"  
+    filters:
+      - or:
+        - type: ingress
+          Ports: [22]
+          Cidr: "0.0.0.0/0"
+        - type: ingress
+          Ports: [22]
+          CidrV6: "::/0"
+    actions:
+      - type: set-permissions
+        remove-ingress: matched
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS EC2.13 Security groups should not allow ingress from 0.0.0.0/0 to port 22.
+        action_desc: This policy automatically detect any security group that allows 0.0.0.0/0 or ::/0 (IPv6) ingress on port 22. Notify it and remove instantly. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXX434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS EC2.13 Security groups should not allow ingress from 0.0.0.0/0 to port 22.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXXX7434/XX-cloud-c-test-sqs
+
+  - name: CIS_EC2_13_RecordSecGrpViolationsPort22
+    resource: security-group
+    description: |
+      This policy regularly check for any security group that allows 0.0.0.0/0 or ::/0 (IPv6) 
+      ingress on port 22. Record the issues in cloudwatch metrices.
+    mode:
+      type: periodic
+      schedule: "rate(24 hours)"
+      role: arn:aws:iam::630XXXXXX7434:role/XXXXXX-custodian-auto-tagger  
+    filters:
+      - or:
+        - type: ingress
+          Ports: [22]
+          Cidr: "0.0.0.0/0"
+        - type: ingress
+          Ports: [22]
+          CidrV6: "::/0"
+    actions:
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS EC2.13 Security groups should not allow ingress from 0.0.0.0/0 to port 22.
+        action_desc: This policy regularly check for any security group that allows 0.0.0.0/0 or ::/0 (IPv6) ingress on port 22. Record the issues in cloudwatch metrices. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXXX7434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS EC2.13 Security groups should not allow ingress from 0.0.0.0/0 to port 22.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX434/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS EC2.14 Security groups should not allow ingress from 0.0.0.0/0 to port 3389.
+
+  - name: CIS_EC2_14_RemoveSecGroupViolationsPort3389
+    resource: security-group
+    description: |
+      This policy automatically detect any security group that allows 0.0.0.0/0 or ::/0 (IPv6) 
+      ingress on port 3389. Notify it and remove instantly.
+    mode:
+      type: cloudtrail
+      role: arn:aws:iam::630XXXXXXXXX7434:role/XXXXXXXX-custodian-auto-tagger
+      events:
+        - source: ec2.amazonaws.com
+          event: AuthorizeSecurityGroupIngress
+          ids: "requestParameters.groupId"
+        - source: ec2.amazonaws.com
+          event: RevokeSecurityGroupIngress
+          ids: "requestParameters.groupId"  
+    filters:
+      - or:
+        - type: ingress
+          Ports: [3389]
+          Cidr: "0.0.0.0/0"
+        - type: ingress
+          Ports: [3389]
+          CidrV6: "::/0"
+    actions:
+      - type: set-permissions
+        remove-ingress: matched
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS EC2.14 Security groups should not allow ingress from 0.0.0.0/0 to port 3389.
+        action_desc: This policy automatically detect any security group that allows 0.0.0.0/0 or ::/0 (IPv6) ingress on port 3389. Notify it and remove instantly. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXX434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS EC2.14 Security groups should not allow ingress from 0.0.0.0/0 to port 3389.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXXXX34/XX-cloud-c-test-sqs
+
+  - name: CIS_EC2_14_RecordSecGrpViolationsPort3389
+    resource: security-group
+    description: |
+      This policy regularly check for any security group that allows 0.0.0.0/0 or ::/0 (IPv6) 
+      ingress on port 3389. Record the issues in cloudwatch metrices.
+    mode:
+      type: periodic
+      schedule: "rate(24 hours)"
+      role: arn:aws:iam::630XXXXXXX434:role/XXXXXXXX-custodian-auto-tagger  
+    filters:
+      - or:
+        - type: ingress
+          Ports: [3389]
+          Cidr: "0.0.0.0/0"
+        - type: ingress
+          Ports: [3389]
+          CidrV6: "::/0"
+    actions:
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS EC2.14 Security groups should not allow ingress from 0.0.0.0/0 to port 3389.
+        action_desc: This policy regularly check for any security group that allows 0.0.0.0/0 or ::/0 (IPv6) ingress on port 3389. Record the issues in cloudwatch metrices. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXXX434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS EC2.14 Security groups should not allow ingress from 0.0.0.0/0 to port 3389.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX34/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS EC2.6 VPC flow logging should be enabled in all VPCs.
+
+  - name: CIS_EC2_6_CreateVpcFlowLogs
+    resource: vpc
+    description: |
+      This policy automatically check whether vpc flow logs is enabled, and create vpc flow logs.
+    mode:
+      type: periodic
+      schedule: "rate(30 days)"
+      role: arn:aws:iam::630XXXXXXX7434:role/XXXXX-custodian-auto-tagger    
+    filters:
+      - type: flow-logs
+        enabled: false
+    actions:
+      - type: set-flow-log
+        DeliverLogsPermissionArn: arn:aws:iam::63XXXXXXXXXX434:role/XXXXXXX-custodian-auto-tagger
+        LogGroupName: /custodian/vpc/flowlogs/
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS EC2.6 VPC flow logging should be enabled in all VPCs.
+        action_desc: This policy automatically check whether vpc flow logs is enabled, and create vpc flow logs. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXXXXXX34/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS EC2.6 VPC flow logging should be enabled in all VPCs.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX434/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS EC2.2 The VPC default security group should not allow inbound and outbound traffic.
+
+  - name: CIS_EC2_2_DeleteRulesFromDefaultSecGroup
+    resource: security-group
+    description: |
+      This policy automatically detect and delete rules from default security group.
+    mode:
+      type: periodic
+      schedule: "rate(7 days)"
+      role: arn:aws:iam::630XXXXXXXX434:role/XXXXXXXX-custodian-auto-tagger    
+    filters:
+      - type: unused
+    actions:
+      - type: set-permissions
+        remove-ingress: matched
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS EC2.2 The VPC default security group should not allow inbound and outbound traffic.
+        action_desc: This policy automatically detect and delete rules from default security group. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX34/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS EC2.2 The VPC default security group should not allow inbound and outbound traffic.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXXX34/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS Config.1 AWS Config should be enabled.
+
+  - name: CIS_Config_1_DetectAndNotifyAwsConfig
+    resource: account
+    description: |
+      This policy automatically detect and notify if the aws config is not enabled.
+    mode:
+      type: periodic
+      schedule: "rate(30 days)"
+      role: arn:aws:iam::63XXXXXXXXX434:role/XXXXXXXXX-custodian-auto-tagger    
+    filters:
+      - type: check-config
+        all-resources: true
+        global-resources: true
+        running: true
+    actions:
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS Config.1 AWS Config should be enabled.
+        action_desc: This policy automatically detect and notify if the aws config is not enabled. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXX34/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS Config.1 AWS Config should be enabled.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX434/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS IAM.5 MFA should be enabled for all IAM users that have a console password.
+
+  - name: CIS_IAM_5_NotifyMfaStatusOfIamUsers
+    resource: iam-user
+    description: |
+      This policy automatically check MFA status of IAM users
+      and notify if MFA is not enabled.
+    mode:
+      type: periodic
+      schedule: "rate(7 days)"
+      role: arn:aws:iam::630XXXXXXXX434:role/XXXXXXX-custodian-auto-tagger    
+    filters:
+      - and:
+        - type: credential
+          key: mfa_active
+          value: false
+        - type: credential
+          key: password_enabled
+          value: true
+    actions:
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS IAM.5 MFA should be enabled for all IAM users that have a console password.
+        action_desc: This policy automatically check MFA status of IAM users and notify if MFA is not enabled.
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXXXX34/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS IAM.5 MFA should be enabled for all IAM users that have a console password.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXXX34/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS IAM.2 IAM users should not have IAM policies attached.
+
+  - name: NotifyIamUsersWithPoliciesAttached
+    resource: iam-user
+    description: |
+      This policy will automatically detect IAM users with IAM policies
+      and remove those users.
+    mode:
+      type: periodic
+      schedule: "rate(24 hours)"
+      role: arn:aws:iam::63XXXXXXXX7434:role/XXXXXXX-custodian-auto-tagger    
+    filters:
+      - type: has-inline-policy
+      - type: policy
+        key: PolicyName
+        value: not-null
+    actions:
+      - delete
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS IAM.2 IAM users should not have IAM policies attached.
+        action_desc: This policy will automatically detect IAM users with IAM policies and remove those users. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX7434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS IAM.2 IAM users should not have IAM policies attached.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXX34/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS IAM.18 Ensure a support role has been created to manage incidents with AWS Support.
+
+  - name: CIS_IAM_18_EnsureSupportRoleCreated
+    resource: aws.iam-policy
+    description: |
+      This policy automatically check and notify if the support role 
+      is not created.
+    mode:
+      type: periodic
+      schedule: "rate(7 days)"
+      role: arn:aws:iam::630XXXXXXXXX434:role/XXXXXXX-custodian-auto-tagger    
+    filters:
+      - type: unused
+      - type: value
+        key: 'PolicyName'
+        value: AWSSupportAccess
+    actions:
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS IAM.18 Ensure a support role has been created to manage incidents with AWS Support.
+        action_desc: This policy automatically check and notify if the support role is not created.
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/63XXXXXXX434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS IAM.18 Ensure a support role has been created to manage incidents with AWS Support.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX7434/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS Cloudtrail.1 CloudTrail should be enabled and configured with at least one multi-Region trail that includes read and write management events.
+
+  - name: CIS_Cloudtrail_1_EnableMultiRegionCloudTrail
+    resource: account
+    description: |
+      This policy automatically detect and configure cloudtrail
+      if it not configured.
+    mode:
+      type: periodic
+      schedule: "rate(30 days)"
+      role: arn:aws:iam::63XXXXXXX7434:role/XXXXXXX-custodian-auto-tagger    
+    filters:
+      - type: check-cloudtrail
+        global-events: false
+        multi-region: false
+        running: false
+        include-management-events: false
+    actions:
+      - type: enable-cloudtrail
+        trail: mytrail
+        bucket: trails
+        global-events: true
+        multi-region: true
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS Cloudtrail.1 CloudTrail should be enabled and configured with at least one multi-Region trail that includes read and write management events.
+        action_desc: This policy automatically detect and configure cloudtrail if it not configured 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX34/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS Cloudtrail.1 CloudTrail should be enabled and configured with at least one multi-Region trail that includes read and write management events.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXX34/XX-cloud-c-test-sqs
+
+#CIS AWS Foundations Benchmark v1.2.0
+#CIS CloudTrail.2 CloudTrail should have encryption at-rest enabled.
+#CIS Cloudtrail.4 CloudTrail log file validation should be enabled.
+#CIS Cloudtrail.5 CloudTrail trails should be integrated with Amazon CloudWatch Logs.
+
+  - name: CIS_Cloudtrail_2_4_5_EnableCloudTrail
+    resource: aws.cloudtrail
+    description: |
+      This policy automatically detect and enable encryption, log file validation
+      and cloudwatch logs for cloudtrail.
+    mode:
+      type: periodic
+      schedule: "rate(30 days)"
+      role: arn:aws:iam::63XXXXXXXXX434:role/XXXXXXX-custodian-auto-tagger  
+    filters:
+      - or:
+        - KmsKeyId: empty
+        - LogFileValidationEnabled: false
+        - IsMultiRegionTrail: false
+        - IsOrganizationTrail: false
+    actions:
+      - type: update-trail
+        attributes:
+          KmsKeyId: arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef
+          EnableLogFileValidation: true
+          IsMultiRegionTrail: true
+          IsOrganizationTrail: true
+          CloudWatchLogsLogGroupArn: arn:aws:iam::630XXXXXX434:role/XXXXXXX-custodian-auto-tagger
+          CloudWatchLogsRoleArn: arn:aws:iam::630XXXXXXXXXX434:role/XXXXXXXXXX-custodian-auto-tagger
+      - type: notify
+        slack_template: slack_notify
+        slack_msg_color: danger
+        violation_desc: CIS CloudTrail.2,4,5 CloudTrail should have encryption at-rest enabled/log file validation should be enabled/integrated with Amazon CloudWatch Logs.
+        action_desc: This policy automatically detect and enable encryption, log file validation and cloudwatch logs for cloudtrail. 
+        to:
+          - https://hooks.slack.com/services/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
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXXXX434/XX-cloud-c-test-sqs
+      - type: notify
+        template: default
+        priority_header: '2'
+        subject: CIS Violation Alert!!! CIS CloudTrail.2,4,5 CloudTrail should have encryption at-rest enabled/log file validation should be enabled/integrated with Amazon CloudWatch Logs.
+        to:
+          - your-email@example.com  # Replace with your email address
+        transport:
+          type: sqs
+          queue: https://sqs.ap-southeast-1.amazonaws.com/630XXXXXX434/XX-cloud-c-test-sqs

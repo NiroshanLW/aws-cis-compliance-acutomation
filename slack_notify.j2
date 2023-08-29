@@ -1,0 +1,33 @@
+{
+   "attachments":[
+      {
+         "fallback":"CIS Compliance Violation Alert",
+         "title":"CIS Compliance Violation Alert!!!",
+         "color":"{{ action['slack_msg_color']|default("danger") }}",
+         "fields":[
+            {
+               "title":"Compliance Violated Resources",
+               "value":"{%- for resource in resources -%}
+                        {{ format_resource(resource, policy['resource']) | replace('\\"', '"') | replace('"', '\\"') }}\n
+                        {%- endfor -%}"
+            },
+            {
+               "title":"Region",
+               "value":"{{ region }}"
+            },
+            {
+               "title":"Violated CIS Control",
+               "value":"{{ action['violation_desc'] }}"
+            },
+            {
+               "title":"Action Taken/Recommended Action",
+               "value":"{{ action['action_desc'] }}"
+            }
+         ]
+      }
+   ],
+   {%- if not recipient.startswith('https://') %}
+   "channel":"{{ recipient }}",
+   {%- endif -%}
+   "username":"AWS CIS Custodian"
+}
